@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Juego estilo Red Ball con perseguidor</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #87CEEB; }
+  canvas { display: block; background: #87CEEB; }
+  #controls { position: fixed; top: 10px; left: 10px; z-index: 10; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <label>Jugador: <input type="file" id="playerImageInput" accept="image/*"></label><br>
+  <label>Perseguidor: <input type="file" id="enemyImageInput" accept="image/*"></label>
+</div>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let gravity = 0.6;
+let keys = { left: false, right: false, up: false };
+
+class Character {
+  constructor(x, y, w, h, img=null) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+    this.img = img;
+    this.vx = 0;
+    this.vy = 0;
+    this.speed = 5;
+    this.onGround = false;
+  }
+
+  draw() {
+    if(this.img){
+      ctx.drawImage(this.img, this.x, this.y, this.w, this.h);
+    } else {
+      ctx.fillStyle = 'red';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
+  }
+
+  update(platforms) {
+    this.vy += gravity;
+    this.y += this.vy;
+    this.x += this.vx;
+
+    this.onGround = false;
+    for(let plat of platforms){
+      if(this.x + this.w > plat.x && this.x < plat.x + plat.w &&
+         this.y + this.h > plat.y && this.y + this.h < plat.y + plat.h){
+        this.y = plat.y - this.h;
+        this.vy = 0;
+        this.onGround = true;
+      }
+    }
+  }
+}
+
+class Platform {
+  constructor(x,y,w,h){
+    this.x = x; this.y=y; this.w=w; this.h=h;
+  }
+  draw(){
+    ctx.fillStyle = 'green';
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+  }
+}
+
+// Plataformas básicas
+const platforms = [
+  new Platform(0, canvas.height - 50, canvas.width, 50),
+  new Platform(300, canvas.height - 150, 200, 20),
+  new Platform(600, canvas.height - 250, 200, 20)
+];
+
+// Personajes
+let player = new Character(100, canvas.height-100, 50,50);
+let enemy = new Character(50, canvas.height-100, 50,50);
+
+const meta = {x: canvas.width-100, y: canvas.height-150, w:50, h:50};
+
+// Controles
+window.addEventListener('keydown', (e)=>{
+  if(e.key === 'ArrowLeft') keys.left = true;
+  if(e.key === 'ArrowRight') keys.right = true;
+  if(e.key === 'ArrowUp') keys.up = true;
+});
+window.addEventListener('keyup', (e)=>{
+  if(e.key === 'ArrowLeft') keys.left = false;
+  if(e.key === 'ArrowRight') keys.right = false;
+  if(e.key === 'ArrowUp') keys.up = false;
+});
+
+// Cargar imágenes
+document.getElementById('playerImageInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(file){
+    const img = new Image();
+    img.onload = ()=> player.img = img;
+    img.src = URL.createObjectURL(file);
+  }
+});
+document.getElementById('enemyImageInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(file){
+    const img = new Image();
+    img.onload = ()=> enemy.img = img;
+    img.src = URL.createObjectURL(file);
+  }
+});
+
+// Game loop
+function gameLoop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Movimiento jugador
+  player.vx = 0;
+  if(keys.left) player.vx = -player.speed;
+  if(keys.right) player.vx = player.speed;
+  if(keys.up && player.onGround) player.vy = -15;
+
+  player.update(platforms);
+
+  // Movimiento enemigo (seguir jugador)
+  if(enemy.x < player.x) enemy.vx = 3;
+  else enemy.vx = -3;
+  enemy.update(platforms);
+
+  // Dibujar plataformas
+  for(let plat of platforms) plat.draw();
+
+  // Dibujar meta
+  ctx.fillStyle = 'yellow';
+  ctx.fillRect(meta.x, meta.y, meta.w, meta.h);
+
+  // Dibujar personajes
+  player.draw();
+  enemy.draw();
+
+  // Revisar meta
+  if(player.x + player.w > meta.x && player.x < meta.x + meta.w &&
+     player.y + player.h > meta.y && player.y < meta.y + meta.h){
+    alert('¡Nivel completado!');
+    player.x = 100; player.y = canvas.height-100;
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
