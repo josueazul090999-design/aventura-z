@@ -1,33 +1,23 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Juego estilo Red Ball con perseguidor</title>
-  <style>
-    body { 
-      margin: 0; 
-      overflow: hidden; 
-      background: #87CEEB; 
-    }
-    canvas { 
-      display: block; 
-      background: #87CEEB; 
-    }
-    #controls {
-      position: fixed;
-      bottom: 10px; /* Cambiado de top a bottom para estar abajo */
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      background: rgba(255,255,255,0.8);
-      padding: 10px;
-      border-radius: 10px;
-    }
-    #controls label {
-      margin-right: 10px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Juego estilo Mario Bros con perseguidor</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #87CEEB; }
+  canvas { display: block; background: #87CEEB; }
+  #controls {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    background: rgba(255,255,255,0.8);
+    padding: 10px;
+    border-radius: 10px;
+  }
+</style>
 </head>
 <body>
 
@@ -46,6 +36,7 @@ canvas.height = window.innerHeight;
 
 let gravity = 0.6;
 let keys = { left: false, right: false, up: false };
+let cameraX = 0;
 
 class Character {
   constructor(x, y, w, h, img=null) {
@@ -62,10 +53,10 @@ class Character {
 
   draw() {
     if(this.img){
-      ctx.drawImage(this.img, this.x, this.y, this.w, this.h);
+      ctx.drawImage(this.img, this.x - cameraX, this.y, this.w, this.h);
     } else {
       ctx.fillStyle = 'red';
-      ctx.fillRect(this.x, this.y, this.w, this.h);
+      ctx.fillRect(this.x - cameraX, this.y, this.w, this.h);
     }
   }
 
@@ -95,15 +86,17 @@ class Platform {
   }
   draw(){
     ctx.fillStyle = 'green';
-    ctx.fillRect(this.x, this.y, this.w, this.h);
+    ctx.fillRect(this.x - cameraX, this.y, this.w, this.h);
   }
 }
 
-// Plataformas básicas
+// Plataformas largas tipo Mario Bros
 const platforms = [
-  new Platform(0, canvas.height - 50, canvas.width, 50),
-  new Platform(300, canvas.height - 150, 200, 20),
-  new Platform(600, canvas.height - 250, 200, 20)
+  new Platform(0, canvas.height - 50, 400, 50),
+  new Platform(500, canvas.height - 100, 200, 20),
+  new Platform(800, canvas.height - 150, 300, 20),
+  new Platform(1200, canvas.height - 200, 200, 20),
+  new Platform(1500, canvas.height - 100, 400, 50),
 ];
 
 // Personajes
@@ -111,7 +104,7 @@ let player = new Character(100, canvas.height-100, 50,50);
 let enemy = new Character(50, canvas.height-100, 50,50);
 
 // Meta
-const meta = {x: canvas.width-100, y: canvas.height-150, w:50, h:50};
+const meta = {x: 1900, y: canvas.height-150, w:50, h:50};
 
 // Controles
 window.addEventListener('keydown', (e)=>{
@@ -143,7 +136,6 @@ document.getElementById('enemyImageInput').addEventListener('change', (e)=>{
   }
 });
 
-// Game loop
 function gameLoop(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
@@ -152,18 +144,22 @@ function gameLoop(){
   if(keys.left) player.vx = -player.speed;
   if(keys.right) player.vx = player.speed;
   if(keys.up && player.onGround) player.vy = -15;
+
   player.update(platforms);
 
-  // Movimiento enemigo (seguir jugador)
+  // Movimiento enemigo simple (seguir jugador)
   enemy.vx = (enemy.x < player.x) ? 3 : -3;
   enemy.update(platforms);
+
+  // Cámara sigue al jugador
+  cameraX = player.x - 200; // offset para que el jugador no quede pegado al borde
 
   // Dibujar plataformas
   for(let plat of platforms) plat.draw();
 
   // Dibujar meta
   ctx.fillStyle = 'yellow';
-  ctx.fillRect(meta.x, meta.y, meta.w, meta.h);
+  ctx.fillRect(meta.x - cameraX, meta.y, meta.w, meta.h);
 
   // Dibujar personajes
   player.draw();
@@ -182,6 +178,5 @@ function gameLoop(){
 
 gameLoop();
 </script>
-
 </body>
 </html>
