@@ -1,217 +1,256 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Juego Celular</title>
-<style>
-body, html {
-  margin: 0; padding: 0; overflow: hidden;
-  background: #87CEEB;
-  height: 100%; width: 100%;
-}
-canvas {
-  display: block;
-  background: #87CEEB;
-}
-
-/* Botones móviles */
-#mobileControls {
-  position: fixed;
-  bottom: 20px;
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  z-index: 20;
-  pointer-events: none;
-}
-.mobile-btn {
-  width: 80px; height: 80px;
-  background: rgba(0,0,0,0.3);
-  border-radius: 50%;
-  border: 2px solid white;
-  pointer-events: auto;
-  touch-action: none;
-  font-size: 30px;
-  color: white;
-}
-#leftRight {
-  display:flex; gap:20px; margin-left:20px;
-}
-#jumpBtn { margin-right:20px; }
-#hud {
-  position: fixed;
-  top: 10px; left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255,255,255,0.8);
-  padding: 8px 15px;
-  border-radius: 10px;
-  font-family: Arial, sans-serif;
-  font-size: 18px;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juego Mario Style</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #87CEEB;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+      background: linear-gradient(#87CEEB, #E0F6FF);
+    }
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: black;
+      font-size: 20px;
+      font-weight: bold;
+      background: rgba(255,255,255,0.7);
+      padding: 6px 10px;
+      border-radius: 8px;
+    }
+    /* Controles táctiles */
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+    .left-controls, .right-controls {
+      display: flex;
+      gap: 15px;
+      pointer-events: auto;
+    }
+    .btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.3);
+      border: 2px solid white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 24px;
+      user-select: none;
+      touch-action: none;
+    }
+  </style>
 </head>
 <body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="hud">Nivel: 1 | Monedas: 0 | Puntos: 0</div>
 
-<div id="hud">
-  <span id="coinCounter">Monedas: 0</span> |
-  <span id="levelCounter">Nivel: 1</span>
-</div>
-
-<canvas id="gameCanvas"></canvas>
-
-<!-- Botones para celular -->
-<div id="mobileControls">
-  <div id="leftRight">
-    <button class="mobile-btn" id="leftBtn">←</button>
-    <button class="mobile-btn" id="rightBtn">→</button>
+  <!-- Controles táctiles -->
+  <div class="controls">
+    <div class="left-controls">
+      <div class="btn" id="btnLeft">⟵</div>
+      <div class="btn" id="btnRight">⟶</div>
+    </div>
+    <div class="right-controls">
+      <div class="btn" id="btnJump">⤒</div>
+    </div>
   </div>
-  <button class="mobile-btn" id="jumpBtn">⤒</button>
-</div>
 
-<script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-function resizeCanvas(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
 
-let keys = {left:false,right:false,up:false};
-let cameraX = 0;
-let currentLevel = 0;
-let gameStarted = true;
-let enemyActive = false;
-let playerSpeed = 5;
-let enemySpeedBase = 2.5;
+    const hud = document.getElementById("hud");
 
-class Character{
-  constructor(x,y,w,h,color){
-    this.x=x; this.y=y; this.w=w; this.h=h;
-    this.color=color;
-    this.vx=0; this.vy=0; this.onGround=false; this.coins=0;
-  }
-  draw(){ ctx.fillStyle=this.color; ctx.fillRect(this.x-cameraX,this.y,this.w,this.h); }
-  update(platforms){
-    this.vy += 0.6;
-    this.y += this.vy;
-    this.x += this.vx;
-    this.onGround = false;
-    for(let p of platforms){
-      if(this.x+this.w>p.x && this.x<p.x+p.w && this.y+this.h>=p.y-10 && this.y+this.h<=p.y+10 && this.vy>=0){
-        this.y = p.y-this.h; this.vy=0; this.onGround=true;
+    // Estado del juego
+    let level = 1;
+    let coins = 0;
+    let score = 0;
+    let keys = { left: false, right: false, up: false };
+
+    class Player {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.width = 40;
+        this.height = 40;
+        this.color = color;
+        this.velX = 0;
+        this.velY = 0;
+        this.speed = 5;
+        this.jumpForce = 15;
+        this.onGround = false;
+      }
+      update(platforms) {
+        // Movimiento horizontal
+        if (keys.left) this.velX = -this.speed;
+        else if (keys.right) this.velX = this.speed;
+        else this.velX = 0;
+
+        // Gravedad
+        this.velY += 0.8;
+
+        this.x += this.velX;
+        this.y += this.velY;
+
+        this.onGround = false;
+        for (let p of platforms) {
+          if (this.x < p.x + p.width &&
+              this.x + this.width > p.x &&
+              this.y + this.height <= p.y + 10 &&
+              this.y + this.height + this.velY >= p.y) {
+            this.y = p.y - this.height;
+            this.velY = 0;
+            this.onGround = true;
+          }
+        }
+      }
+      jump() {
+        if (this.onGround) {
+          this.velY = -this.jumpForce;
+          this.onGround = false;
+        }
+      }
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
       }
     }
-  }
-}
 
-class Platform{
-  constructor(x,y,w,h){this.x=x;this.y=y;this.w=w;this.h=h;}
-  draw(){ctx.fillStyle="green"; ctx.fillRect(this.x-cameraX,this.y,this.w,this.h);}
-}
-
-class Coin{
-  constructor(x,y){this.x=x;this.y=y;this.r=10;this.collected=false;}
-  draw(){if(!this.collected){ctx.fillStyle="gold"; ctx.beginPath(); ctx.arc(this.x-cameraX,this.y,this.r,0,Math.PI*2); ctx.fill();}}
-}
-
-class Obstacle{
-  constructor(x,y,w,h){this.x=x;this.y=y;this.w=w;this.h=h;}
-  draw(){ctx.fillStyle="brown"; ctx.fillRect(this.x-cameraX,this.y,this.w,this.h);}
-}
-
-// Generar niveles
-const levels=[];
-for(let i=0;i<10;i++){
-  let platforms=[], coins=[], obstacles=[];
-  let baseY = canvas.height-80;
-  platforms.push(new Platform(0, baseY, 5000, 30)); // BASE LARGA SIEMPRE
-  let startX=400; let width=120;
-  for(let j=0;j<15;j++){
-    let x=startX+j*250;
-    let y = baseY - (100 + Math.random()*150);
-    platforms.push(new Platform(x,y,width,20));
-    if(Math.random()<0.7) coins.push(new Coin(x+50,y-30));
-    if(Math.random()<0.4) obstacles.push(new Obstacle(x+40,y-40,30,40));
-  }
-  let last = platforms[platforms.length-1];
-  let meta={x:last.x+last.w/2-25,y:last.y-50,w:50,h:50};
-  levels.push({bg:`hsl(${i*36},70%,80%)`,platforms,coins,obstacles,meta});
-}
-
-let player = new Character(150,0,80,80,"red");
-let enemy = new Character(50,0,80,80,"blue");
-
-// Botones móviles
-function setupMobile(id, press, release){
-  const btn=document.getElementById(id);
-  btn.addEventListener("touchstart",e=>{e.preventDefault(); press();});
-  btn.addEventListener("touchend",e=>{e.preventDefault(); release();});
-}
-setupMobile("leftBtn", ()=>keys.left=true, ()=>keys.left=false);
-setupMobile("rightBtn", ()=>keys.right=true, ()=>keys.right=false);
-setupMobile("jumpBtn", ()=>{if(player.onGround) keys.up=true;}, ()=>keys.up=false);
-
-// Reset nivel
-function resetLevel(){
-  const lvl=levels[currentLevel];
-  player.x=150; player.y=lvl.platforms[0].y-player.h;
-  player.vx=0; player.vy=0;
-  keys.left=false; keys.right=false; keys.up=false;
-  enemy.x=50; enemy.y=lvl.platforms[0].y-enemy.h;
-  enemy.vx=0; enemy.vy=0;
-  cameraX=0; enemyActive=false;
-  lvl.coins.forEach(c=>c.collected=false);
-  setTimeout(()=>enemyActive=true,4000);
-  document.getElementById("levelCounter").innerText="Nivel: "+(currentLevel+1);
-}
-resetLevel();
-
-function enemyAI(){
-  if(!enemyActive) return;
-  const lvl=levels[currentLevel];
-  let dx=player.x-enemy.x;
-  let dy=player.y-enemy.y;
-  let speedFactor=1+Math.floor(currentLevel/5)*0.3;
-  enemy.vx=(dx>0?1:-1)*enemySpeedBase*speedFactor;
-  if(dy<0 && enemy.onGround) enemy.vy=-12;
-}
-
-function gameLoop(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const lvl=levels[currentLevel];
-  canvas.style.background=lvl.bg;
-  player.vx=0;
-  if(keys.left) player.vx=-playerSpeed;
-  if(keys.right) player.vx=playerSpeed;
-  if(keys.up && player.onGround){player.vy=-15; keys.up=false;}
-  player.update(lvl.platforms);
-  lvl.coins.forEach(c=>{
-    if(!c.collected && player.x+player.w>c.x-c.r && player.x<c.x+c.r && player.y+player.h>c.y-c.r && player.y<c.y+c.r){
-      c.collected=true; player.coins++;
+    class Platform {
+      constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+      }
+      draw() {
+        ctx.fillStyle = "green";
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      }
     }
-  });
-  document.getElementById("coinCounter").innerText="Monedas: "+player.coins;
-  enemyAI(); if(enemyActive) enemy.update(lvl.platforms);
-  cameraX=player.x-canvas.width/2; if(cameraX<0) cameraX=0;
-  lvl.platforms.forEach(p=>p.draw());
-  lvl.obstacles.forEach(o=>o.draw());
-  lvl.coins.forEach(c=>c.draw());
-  ctx.fillStyle="yellow"; ctx.fillRect(lvl.meta.x-cameraX,lvl.meta.y,lvl.meta.w,lvl.meta.h);
-  player.draw(); if(enemyActive) enemy.draw();
-  if(player.x+player.w>lvl.meta.x && player.x<lvl.meta.x+lvl.meta.w && player.y+player.h>lvl.meta.y && player.y<lvl.meta.y+lvl.meta.h){
-    currentLevel++;
-    if(currentLevel>=levels.length){alert("¡Ganaste! Monedas: "+player.coins); currentLevel=0; player.coins=0;}
-    resetLevel();
-  }
-  if(player.y>lvl.platforms[0].y+200){alert("¡Caíste!"); resetLevel();}
-  if(player.x+player.w>enemy.x && player.x<enemy.x+enemy.w && player.y+player.h>enemy.y && player.y<enemy.y+enemy.h){alert("Game Over"); resetLevel();}
-  requestAnimationFrame(gameLoop);
-}
-gameLoop();
-</script>
+
+    class Coin {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 10;
+        this.collected = false;
+      }
+      draw() {
+        if (!this.collected) {
+          ctx.fillStyle = "gold";
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    let player;
+    let platforms = [];
+    let coinsArr = [];
+
+    function generateLevel() {
+      platforms = [];
+      coinsArr = [];
+
+      // Base larga
+      platforms.push(new Platform(0, canvas.height - 50, canvas.width, 50));
+
+      // Escalones
+      for (let i = 0; i < 5; i++) {
+        let px = 200 + i * 200;
+        let py = canvas.height - (100 + i * 70);
+        platforms.push(new Platform(px, py, 120, 20));
+        coinsArr.push(new Coin(px + 60, py - 20));
+      }
+
+      // Recolocar jugador sobre la base (no bajo tierra)
+      player = new Player(100, canvas.height - 100, "blue");
+    }
+
+    generateLevel();
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Dibujar plataformas
+      for (let p of platforms) p.draw();
+
+      // Dibujar monedas
+      for (let c of coinsArr) {
+        if (!c.collected &&
+            player.x < c.x + c.radius &&
+            player.x + player.width > c.x - c.radius &&
+            player.y < c.y + c.radius &&
+            player.y + player.height > c.y - c.radius) {
+          c.collected = true;
+          coins++;
+          score += 100;
+        }
+        c.draw();
+      }
+
+      // Actualizar jugador
+      player.update(platforms);
+      player.draw();
+
+      // Actualizar HUD
+      hud.textContent = `Nivel: ${level} | Monedas: ${coins} | Puntos: ${score}`;
+
+      requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
+
+    // Controles de teclado
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "ArrowLeft") keys.left = true;
+      if (e.code === "ArrowRight") keys.right = true;
+      if (e.code === "Space") player.jump();
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "ArrowLeft") keys.left = false;
+      if (e.code === "ArrowRight") keys.right = false;
+    });
+
+    // Controles táctiles
+    function bindButton(btn, action, isJump = false) {
+      btn.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        if (isJump) player.jump();
+        else keys[action] = true;
+      });
+      btn.addEventListener("touchend", (e) => {
+        e.preventDefault();
+        if (!isJump) keys[action] = false;
+      });
+    }
+    bindButton(document.getElementById("btnLeft"), "left");
+    bindButton(document.getElementById("btnRight"), "right");
+    bindButton(document.getElementById("btnJump"), null, true);
+  </script>
 </body>
 </html>
