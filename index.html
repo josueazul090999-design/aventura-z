@@ -1,21 +1,41 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Juego estilo Red Ball con perseguidor</title>
-<style>
-  body { margin: 0; overflow: hidden; background: #87CEEB; }
-  canvas { display: block; background: #87CEEB; }
-  #controls { position: fixed; top: 10px; left: 10px; z-index: 10; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juego estilo Red Ball con perseguidor</title>
+  <style>
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      background: #87CEEB; 
+    }
+    canvas { 
+      display: block; 
+      background: #87CEEB; 
+    }
+    #controls {
+      position: fixed;
+      bottom: 10px; /* Cambiado de top a bottom para estar abajo */
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: rgba(255,255,255,0.8);
+      padding: 10px;
+      border-radius: 10px;
+    }
+    #controls label {
+      margin-right: 10px;
+    }
+  </style>
 </head>
 <body>
 
 <div id="controls">
-  <label>Jugador: <input type="file" id="playerImageInput" accept="image/*"></label><br>
+  <label>Jugador: <input type="file" id="playerImageInput" accept="image/*"></label>
   <label>Perseguidor: <input type="file" id="enemyImageInput" accept="image/*"></label>
 </div>
+
 <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -68,7 +88,10 @@ class Character {
 
 class Platform {
   constructor(x,y,w,h){
-    this.x = x; this.y=y; this.w=w; this.h=h;
+    this.x = x;
+    this.y=y;
+    this.w=w;
+    this.h=h;
   }
   draw(){
     ctx.fillStyle = 'green';
@@ -87,6 +110,7 @@ const platforms = [
 let player = new Character(100, canvas.height-100, 50,50);
 let enemy = new Character(50, canvas.height-100, 50,50);
 
+// Meta
 const meta = {x: canvas.width-100, y: canvas.height-150, w:50, h:50};
 
 // Controles
@@ -128,12 +152,10 @@ function gameLoop(){
   if(keys.left) player.vx = -player.speed;
   if(keys.right) player.vx = player.speed;
   if(keys.up && player.onGround) player.vy = -15;
-
   player.update(platforms);
 
   // Movimiento enemigo (seguir jugador)
-  if(enemy.x < player.x) enemy.vx = 3;
-  else enemy.vx = -3;
+  enemy.vx = (enemy.x < player.x) ? 3 : -3;
   enemy.update(platforms);
 
   // Dibujar plataformas
@@ -151,7 +173,8 @@ function gameLoop(){
   if(player.x + player.w > meta.x && player.x < meta.x + meta.w &&
      player.y + player.h > meta.y && player.y < meta.y + meta.h){
     alert('¡Nivel completado!');
-    player.x = 100; player.y = canvas.height-100;
+    player.x = 100; 
+    player.y = canvas.height-100;
   }
 
   requestAnimationFrame(gameLoop);
@@ -159,5 +182,6 @@ function gameLoop(){
 
 gameLoop();
 </script>
+
 </body>
 </html>
