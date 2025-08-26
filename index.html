@@ -3,204 +3,256 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Laberinto Movil</title>
+<title>Red Ball + Mario Bros Side-Scroller</title>
 <style>
-  body { margin:0; overflow:hidden; background:black; }
-  canvas { display:block; background:#cce6ff; }
+body { margin:0; overflow:hidden; font-family:Arial,sans-serif; }
+canvas { display:block; background:#87CEEB; }
 
-  /* Botones móviles */
-  .controls {
-    position:absolute;
-    bottom:20px;
-    width:100%;
-    display:flex;
-    justify-content:space-between;
-    pointer-events:none;
-  }
-  .left-right, .jump {
-    pointer-events:auto;
-  }
-  .btn {
-    width:80px; height:80px;
-    border-radius:50%;
-    background:rgba(255,255,255,0.3);
-    margin:10px;
-    font-size:22px;
-    color:white;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    user-select:none;
-  }
+/* CONTROLES */
+#topControls {
+  position: fixed; top:10px; left:50%; transform:translateX(-50%);
+  background: rgba(255,255,255,0.9); padding:10px; border-radius:10px; z-index:10;
+}
+#bottomControls {
+  position: fixed; bottom:10px; left:50%; transform:translateX(-50%);
+  background: rgba(255,255,255,0.9); padding:10px; border-radius:10px; z-index:10;
+}
+#bottomControls button { margin-right:10px; }
 
-  /* HUD */
-  #hud {
-    position:absolute;
-    top:10px; left:10px;
-    color:white;
-    font-size:20px;
-    font-family:sans-serif;
-    background:rgba(0,0,0,0.4);
-    padding:5px 10px;
-    border-radius:8px;
-  }
+/* BOTONES MÓVILES */
+#mobileControls {
+  position: fixed;
+  bottom: 30px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  z-index: 20;
+  pointer-events: none; /* los hijos sí reciben evento */
+}
+.mobile-btn {
+  width: 80px; height: 80px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 50%;
+  border: 2px solid white;
+  pointer-events: auto;
+  touch-action: none;
+}
+#leftRight {
+  display:flex; gap:20px; margin-left:20px;
+}
+#jumpBtn { margin-right:20px; }
 </style>
 </head>
 <body>
-<canvas id="gameCanvas"></canvas>
-<div id="hud">Nivel: 1 | Monedas: 0</div>
 
-<!-- Controles móviles -->
-<div class="controls">
-  <div class="left-right">
-    <div class="btn" id="left">⟵</div>
-    <div class="btn" id="right">⟶</div>
+<div id="topControls">
+  <label>Jugador: <input type="file" id="playerImageInput" accept="image/*"></label>
+  <label>Perseguidor: <input type="file" id="enemyImageInput" accept="image/*"></label>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="bottomControls">
+  <button id="startBtn">Start</button>
+  <button id="resetBtn">Reset</button>
+  <span>Teclas: ← ↑ →</span>
+  <span id="coinCounter" style="margin-left:20px;">Monedas: 0</span>
+  <span id="levelCounter" style="margin-left:20px;">Nivel: 1</span>
+</div>
+
+<!-- BOTONES PARA CELULAR -->
+<div id="mobileControls">
+  <div id="leftRight">
+    <button class="mobile-btn" id="leftBtn">←</button>
+    <button class="mobile-btn" id="rightBtn">→</button>
   </div>
-  <div class="jump">
-    <div class="btn" id="jump">⤒</div>
-  </div>
+  <button class="mobile-btn" id="jumpBtn">⤒</button>
 </div>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let keys = {left:false, right:false, up:false};
-let levelIndex = 0;
-let score = 0;
+let keys = {left:false,right:false,up:false};
+let cameraX = 0;
+let currentLevel = 0;
+let gameStarted = false;
+let enemyActive = false;
+let playerSpeed = 5;
+let enemySpeedBase = 2.5;
 
-class Platform {
-  constructor(x,y,w,h){ this.x=x; this.y=y; this.w=w; this.h=h; }
-  draw(){ ctx.fillStyle="#654321"; ctx.fillRect(this.x,this.y,this.w,this.h); }
-}
-class Player {
-  constructor(x,y){
-    this.x=x; this.y=y; this.w=40; this.h=40;
-    this.vx=0; this.vy=0; this.onGround=false;
+class Character{
+  constructor(x,y,w,h,img=null){
+    this.x=x; this.y=y; this.w=w; this.h=h; this.img=img;
+    this.vx=0; this.vy=0; this.onGround=false; this.coins=0;
+  }
+  draw(){ 
+    if(this.img) ctx.drawImage(this.img,this.x-cameraX,this.y,this.w,this.h);
+    else {ctx.fillStyle='red'; ctx.fillRect(this.x-cameraX,this.y,this.w,this.h);}
   }
   update(platforms){
-    this.vx=0;
-    if(keys.left) this.vx=-5;
-    if(keys.right) this.vx=5;
-    this.vy+=0.8;
-    this.x+=this.vx;
-    this.y+=this.vy;
-    this.onGround=false;
+    this.vy += 0.6;
+    this.y += this.vy;
+    this.x += this.vx;
+    this.onGround = false;
     for(let p of platforms){
-      if(this.x<this.x+p.w && this.x+this.w>p.x &&
-         this.y+this.h>p.y && this.y+this.h<this.y+this.vy+this.h &&
-         this.vy>=0){
-        this.y=p.y-this.h;
-        this.vy=0;
-        this.onGround=true;
-      }
-    }
-    if(this.y>canvas.height){ resetLevel(); }
-  }
-  draw(){ ctx.fillStyle="blue"; ctx.fillRect(this.x,this.y,this.w,this.h); }
-}
-class Enemy {
-  constructor(x,y){
-    this.x=x; this.y=y; this.w=40; this.h=40;
-    this.vx=2+levelIndex*0.2; this.vy=0;
-  }
-  update(platforms){
-    this.vy+=0.8;
-    this.x+=this.vx;
-    this.y+=this.vy;
-    for(let p of platforms){
-      if(this.x<this.x+p.w && this.x+this.w>p.x &&
-         this.y+this.h>p.y && this.y+this.h<this.y+this.vy+this.h &&
-         this.vy>=0){
-        this.y=p.y-this.h;
-        this.vy=0;
+      if(this.x+this.w>p.x && this.x<p.x+p.w && this.y+this.h>=p.y-10 && this.y+this.h<=p.y+10 && this.vy>=0){
+        this.y = p.y-this.h; this.vy=0; this.onGround=true;
       }
     }
   }
-  draw(){ ctx.fillStyle="red"; ctx.fillRect(this.x,this.y,this.w,this.h); }
 }
-class Coin {
-  constructor(x,y){ this.x=x; this.y=y; this.r=10; this.collected=false; }
-  draw(){ if(!this.collected){ ctx.fillStyle="gold"; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fill(); } }
-}
-let player, enemy, coins, platforms, meta;
 
-function buildLevel(){
-  platforms=[]; coins=[];
-  let baseY = canvas.height-60;
-  // BASE ocupa todo el ancho visible
-  platforms.push(new Platform(0, baseY, canvas.width, 20));
-  // escalones
-  for(let i=0;i<8;i++){
-    let x=200+i*200;
-    let y=baseY-(Math.random()*150+50);
-    platforms.push(new Platform(x,y,120,20));
-    if(Math.random()<0.7) coins.push(new Coin(x+60,y-30));
+class Platform{
+  constructor(x,y,w,h){this.x=x;this.y=y;this.w=w;this.h=h;}
+  draw(){ctx.fillStyle='green'; ctx.fillRect(this.x-cameraX,this.y,this.w,this.h);}
+}
+
+class Coin{
+  constructor(x,y){this.x=x;this.y=y;this.radius=10;this.collected=false;}
+  draw(){if(!this.collected){ctx.fillStyle='gold'; ctx.beginPath(); ctx.arc(this.x-cameraX,this.y,this.radius,0,Math.PI*2); ctx.fill();}}
+}
+
+class Obstacle{
+  constructor(x,y,w,h){this.x=x; this.y=y; this.w=w; this.h=h;}
+  draw(){ctx.fillStyle='brown'; ctx.fillRect(this.x-cameraX,this.y,this.w,this.h);}
+}
+
+// NIVELES
+const levels = [];
+for(let i=0;i<10;i++){
+  let platforms=[]; let coins=[]; let obstacles=[];
+  let baseY = canvas.height-100;
+  platforms.push(new Platform(0, baseY, canvas.width*2, 20));
+  
+  let startX=400; let width=120;
+  for(let j=0;j<12;j++){
+    let x=startX+j*200;
+    let y = baseY - (Math.random()*150);
+    platforms.push(new Platform(x,y,width,20));
+    if(Math.random()<0.7) coins.push(new Coin(x+50,y-30));
+    if(Math.random()<0.4) obstacles.push(new Obstacle(x+Math.random()*50,y-40,30,40));
   }
-  let last=platforms[platforms.length-1];
-  meta={x:last.x+last.w/2-25,y:last.y-50,w:50,h:50};
-  player=new Player(80,baseY-40);
-  enemy=new Enemy(20,baseY-40);
+  
+  let lastPlatform = platforms[platforms.length-1];
+  let meta = {x:lastPlatform.x + lastPlatform.w/2 - 25, y:lastPlatform.y - 50, w:50, h:50};
+  levels.push({bg:`hsl(${i*36},70%,80%)`,platforms,coins,obstacles,meta});
 }
-function resetLevel(){ buildLevel(); }
-function nextLevel(){ levelIndex++; buildLevel(); }
 
-buildLevel();
+let player = new Character(0,0,50,50);
+let enemy = new Character(0,0,50,50);
 
+// CONTROLES TECLADO
+window.addEventListener('keydown', e => {
+  if(e.key==='ArrowLeft') keys.left=true; 
+  if(e.key==='ArrowRight') keys.right=true; 
+  if(e.key==='ArrowUp') keys.up=true;
+});
+window.addEventListener('keyup', e => {
+  if(e.key==='ArrowLeft') keys.left=false; 
+  if(e.key==='ArrowRight') keys.right=false; 
+  if(e.key==='ArrowUp') keys.up=false;
+});
+
+// CONTROLES MÓVILES
+function setupMobileButton(id, onPress, onRelease){
+  const btn=document.getElementById(id);
+  btn.addEventListener("touchstart", e=>{e.preventDefault(); onPress();});
+  btn.addEventListener("touchend", e=>{e.preventDefault(); onRelease();});
+}
+setupMobileButton("leftBtn", ()=>keys.left=true, ()=>keys.left=false);
+setupMobileButton("rightBtn", ()=>keys.right=true, ()=>keys.right=false);
+setupMobileButton("jumpBtn", ()=>{if(player.onGround) keys.up=true;}, ()=>keys.up=false);
+
+// IMÁGENES
+document.getElementById('playerImageInput').addEventListener('change', e => {
+  const f=e.target.files[0]; if(f){const i=new Image(); i.onload=()=>player.img=i;i.src=URL.createObjectURL(f);}
+});
+document.getElementById('enemyImageInput').addEventListener('change', e => {
+  const f=e.target.files[0]; if(f){const i=new Image(); i.onload=()=>enemy.img=i;i.src=URL.createObjectURL(f);}
+});
+
+// START y RESET
+document.getElementById('startBtn').onclick=()=>{
+  gameStarted=true;currentLevel=0;playerSpeed=5;enemySpeedBase=2.5; resetLevel();
+};
+document.getElementById('resetBtn').onclick=()=>{resetLevel();};
+
+// RESET NIVEL
+function resetLevel(){
+  const lvl = levels[currentLevel];
+  player.x = lvl.platforms[0].x + 150; 
+  player.y = lvl.platforms[0].y - player.h; 
+  player.vx = 0; 
+  player.vy = 0; 
+  keys.left=false; keys.right=false; keys.up=false;
+  enemy.x = lvl.platforms[0].x + 50;  
+  enemy.y = lvl.platforms[0].y - enemy.h;
+  enemy.vx=0; enemy.vy=0;
+  cameraX = 0; enemyActive=false;
+  lvl.coins.forEach(c => c.collected=false);
+  setTimeout(()=>{enemyActive=true;},4000);
+  let lastPlatform = lvl.platforms[lvl.platforms.length-1];
+  lvl.meta.x = lastPlatform.x + lastPlatform.w/2 - 25;
+  lvl.meta.y = lastPlatform.y - 50;
+  document.getElementById('levelCounter').innerText=`Nivel: ${currentLevel+1}`;
+}
+
+// ENEMIGO INTELIGENTE
+function enemyAI(){
+  if(!enemyActive) return;
+  const lvl=levels[currentLevel];
+  let dx = player.x - enemy.x;
+  let dy = player.y - enemy.y;
+  let speedFactor = 1 + Math.floor(currentLevel/5)*0.3;
+  enemy.vx = (dx>0?1:-1) * enemySpeedBase * speedFactor;
+  for(let plat of lvl.platforms){
+    if(Math.abs(enemy.x - plat.x)<5 && enemy.onGround && dy<0) enemy.vy=-12;
+  }
+  for(let obs of lvl.obstacles){
+    if(enemy.x+enemy.w>obs.x-5 && enemy.x<obs.x+obs.w+5 && enemy.onGround) enemy.vy=-12;
+  }
+  if(dy<0 && enemy.onGround) enemy.vy=-12;
+}
+
+// GAME LOOP
 function gameLoop(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  // BG
-  ctx.fillStyle=`hsl(${levelIndex*36},70%,80%)`;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  for(let p of platforms) p.draw();
-  for(let c of coins) c.draw();
-
-  ctx.fillStyle="green";
-  ctx.fillRect(meta.x,meta.y,meta.w,meta.h);
-
-  player.update(platforms);
-  player.draw();
-
-  enemy.update(platforms);
-  enemy.draw();
-
-  for(let c of coins){
-    if(!c.collected && Math.hypot(player.x-player.w/2-c.x, player.y-player.h/2-c.y)<30){
-      c.collected=true; score++;
+  if(!gameStarted){ctx.fillStyle='black';ctx.font='30px Arial';ctx.fillText('Presiona Start para comenzar',50,50); requestAnimationFrame(gameLoop); return;}
+  const lvl = levels[currentLevel];
+  canvas.style.background = lvl.bg;
+  player.vx=0;
+  if(keys.left) player.vx=-playerSpeed;
+  if(keys.right) player.vx=playerSpeed;
+  if(keys.up && player.onGround){player.vy=-15; keys.up=false;}
+  player.update(lvl.platforms);
+  lvl.coins.forEach(c=>{
+    if(!c.collected && player.x+player.w>c.x-c.radius && player.x<c.x+c.radius && player.y+player.h>c.y-c.radius && player.y<c.y+c.radius){
+      c.collected=true; player.coins++;
     }
+  });
+  document.getElementById('coinCounter').innerText=`Monedas: ${player.coins}`;
+  enemyAI(); if(enemyActive) enemy.update(lvl.platforms);
+  cameraX = player.x - canvas.width/2;
+  if(cameraX < 0) cameraX = 0;
+  lvl.platforms.forEach(p=>p.draw());
+  lvl.obstacles.forEach(o=>o.draw());
+  lvl.coins.forEach(c=>c.draw());
+  ctx.fillStyle='yellow'; ctx.fillRect(lvl.meta.x-cameraX,lvl.meta.y,lvl.meta.w,lvl.meta.h);
+  player.draw(); if(enemyActive) enemy.draw();
+  if(player.x+player.w>lvl.meta.x && player.x<lvl.meta.x+lvl.meta.w && player.y+player.h>lvl.meta.y && player.y<lvl.meta.y+lvl.meta.h){
+    currentLevel++;
+    playerSpeed+=0.5; enemySpeedBase+=0.3;
+    if(currentLevel>=levels.length){alert(`¡Ganaste todos los niveles! Monedas totales: ${player.coins}`); gameStarted=false;}
+    else{alert(`¡Nivel completado! Monedas recogidas: ${player.coins}`); resetLevel();}
   }
-  if(player.x<enemy.x+enemy.w && player.x+player.w>enemy.x &&
-     player.y<enemy.y+enemy.h && player.y+player.h>enemy.y){ resetLevel(); }
-  if(player.x<meta.x+meta.w && player.x+player.w>meta.x &&
-     player.y<meta.y+meta.h && player.y+player.h>meta.y){ nextLevel(); }
-
-  document.getElementById("hud").textContent=`Nivel: ${levelIndex+1} | Monedas: ${score}`;
-
+  if(player.y>lvl.platforms[0].y + 200){alert('¡Te caíste!'); resetLevel();}
+  if(player.x+player.w>enemy.x && player.x<enemy.x+enemy.w && player.y+player.h>enemy.y && player.y<enemy.y+enemy.h){alert('¡Game Over! Te atrapó el enemigo.'); resetLevel();}
   requestAnimationFrame(gameLoop);
 }
 gameLoop();
-
-// Controles teclado
-window.addEventListener("keydown",e=>{
-  if(e.key==="ArrowLeft") keys.left=true;
-  if(e.key==="ArrowRight") keys.right=true;
-  if(e.key==="ArrowUp" && player.onGround) player.vy=-15;
-});
-window.addEventListener("keyup",e=>{
-  if(e.key==="ArrowLeft") keys.left=false;
-  if(e.key==="ArrowRight") keys.right=false;
-});
-
-// Controles móviles
-document.getElementById("left").addEventListener("touchstart",()=>keys.left=true);
-document.getElementById("left").addEventListener("touchend",()=>keys.left=false);
-document.getElementById("right").addEventListener("touchstart",()=>keys.right=true);
-document.getElementById("right").addEventListener("touchend",()=>keys.right=false);
-document.getElementById("jump").addEventListener("touchstart",()=>{if(player.onGround) player.vy=-15;});
-
 </script>
 </body>
 </html>
