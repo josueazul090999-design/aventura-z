@@ -1,255 +1,206 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Juego Mario Style</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: #87CEEB;
-      font-family: Arial, sans-serif;
-    }
-    canvas {
-      display: block;
-      background: linear-gradient(#87CEEB, #E0F6FF);
-    }
-    #hud {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: black;
-      font-size: 20px;
-      font-weight: bold;
-      background: rgba(255,255,255,0.7);
-      padding: 6px 10px;
-      border-radius: 8px;
-    }
-    /* Controles táctiles */
-    .controls {
-      position: absolute;
-      bottom: 20px;
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      pointer-events: none;
-    }
-    .left-controls, .right-controls {
-      display: flex;
-      gap: 15px;
-      pointer-events: auto;
-    }
-    .btn {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.3);
-      border: 2px solid white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: white;
-      font-size: 24px;
-      user-select: none;
-      touch-action: none;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laberinto Movil</title>
+<style>
+  body { margin:0; overflow:hidden; background:black; }
+  canvas { display:block; background:#cce6ff; }
+
+  /* Botones móviles */
+  .controls {
+    position:absolute;
+    bottom:20px;
+    width:100%;
+    display:flex;
+    justify-content:space-between;
+    pointer-events:none;
+  }
+  .left-right, .jump {
+    pointer-events:auto;
+  }
+  .btn {
+    width:80px; height:80px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.3);
+    margin:10px;
+    font-size:22px;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    user-select:none;
+  }
+
+  /* HUD */
+  #hud {
+    position:absolute;
+    top:10px; left:10px;
+    color:white;
+    font-size:20px;
+    font-family:sans-serif;
+    background:rgba(0,0,0,0.4);
+    padding:5px 10px;
+    border-radius:8px;
+  }
+</style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
-  <div id="hud">Nivel: 1 | Monedas: 0 | Puntos: 0</div>
+<canvas id="gameCanvas"></canvas>
+<div id="hud">Nivel: 1 | Monedas: 0</div>
 
-  <!-- Controles táctiles -->
-  <div class="controls">
-    <div class="left-controls">
-      <div class="btn" id="btnLeft">⟵</div>
-      <div class="btn" id="btnRight">⟶</div>
-    </div>
-    <div class="right-controls">
-      <div class="btn" id="btnJump">⤒</div>
-    </div>
+<!-- Controles móviles -->
+<div class="controls">
+  <div class="left-right">
+    <div class="btn" id="left">⟵</div>
+    <div class="btn" id="right">⟶</div>
   </div>
+  <div class="jump">
+    <div class="btn" id="jump">⤒</div>
+  </div>
+</div>
 
-  <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const hud = document.getElementById("hud");
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-    // Estado del juego
-    let level = 1;
-    let coins = 0;
-    let score = 0;
-    let keys = { left: false, right: false, up: false };
+let keys = {left:false, right:false, up:false};
+let levelIndex = 0;
+let score = 0;
 
-    class Player {
-      constructor(x, y, color) {
-        this.x = x;
-        this.y = y;
-        this.width = 40;
-        this.height = 40;
-        this.color = color;
-        this.velX = 0;
-        this.velY = 0;
-        this.speed = 5;
-        this.jumpForce = 15;
-        this.onGround = false;
-      }
-      update(platforms) {
-        // Movimiento horizontal
-        if (keys.left) this.velX = -this.speed;
-        else if (keys.right) this.velX = this.speed;
-        else this.velX = 0;
-
-        // Gravedad
-        this.velY += 0.8;
-
-        this.x += this.velX;
-        this.y += this.velY;
-
-        this.onGround = false;
-        for (let p of platforms) {
-          if (this.x < p.x + p.width &&
-              this.x + this.width > p.x &&
-              this.y + this.height <= p.y + 10 &&
-              this.y + this.height + this.velY >= p.y) {
-            this.y = p.y - this.height;
-            this.velY = 0;
-            this.onGround = true;
-          }
-        }
-      }
-      jump() {
-        if (this.onGround) {
-          this.velY = -this.jumpForce;
-          this.onGround = false;
-        }
-      }
-      draw() {
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+class Platform {
+  constructor(x,y,w,h){ this.x=x; this.y=y; this.w=w; this.h=h; }
+  draw(){ ctx.fillStyle="#654321"; ctx.fillRect(this.x,this.y,this.w,this.h); }
+}
+class Player {
+  constructor(x,y){
+    this.x=x; this.y=y; this.w=40; this.h=40;
+    this.vx=0; this.vy=0; this.onGround=false;
+  }
+  update(platforms){
+    this.vx=0;
+    if(keys.left) this.vx=-5;
+    if(keys.right) this.vx=5;
+    this.vy+=0.8;
+    this.x+=this.vx;
+    this.y+=this.vy;
+    this.onGround=false;
+    for(let p of platforms){
+      if(this.x<this.x+p.w && this.x+this.w>p.x &&
+         this.y+this.h>p.y && this.y+this.h<this.y+this.vy+this.h &&
+         this.vy>=0){
+        this.y=p.y-this.h;
+        this.vy=0;
+        this.onGround=true;
       }
     }
-
-    class Platform {
-      constructor(x, y, width, height) {
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
-      }
-      draw() {
-        ctx.fillStyle = "green";
-        ctx.fillRect(this.x, this.y, this.width, this.height);
-      }
-    }
-
-    class Coin {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.radius = 10;
-        this.collected = false;
-      }
-      draw() {
-        if (!this.collected) {
-          ctx.fillStyle = "gold";
-          ctx.beginPath();
-          ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-          ctx.fill();
-        }
+    if(this.y>canvas.height){ resetLevel(); }
+  }
+  draw(){ ctx.fillStyle="blue"; ctx.fillRect(this.x,this.y,this.w,this.h); }
+}
+class Enemy {
+  constructor(x,y){
+    this.x=x; this.y=y; this.w=40; this.h=40;
+    this.vx=2+levelIndex*0.2; this.vy=0;
+  }
+  update(platforms){
+    this.vy+=0.8;
+    this.x+=this.vx;
+    this.y+=this.vy;
+    for(let p of platforms){
+      if(this.x<this.x+p.w && this.x+this.w>p.x &&
+         this.y+this.h>p.y && this.y+this.h<this.y+this.vy+this.h &&
+         this.vy>=0){
+        this.y=p.y-this.h;
+        this.vy=0;
       }
     }
+  }
+  draw(){ ctx.fillStyle="red"; ctx.fillRect(this.x,this.y,this.w,this.h); }
+}
+class Coin {
+  constructor(x,y){ this.x=x; this.y=y; this.r=10; this.collected=false; }
+  draw(){ if(!this.collected){ ctx.fillStyle="gold"; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fill(); } }
+}
+let player, enemy, coins, platforms, meta;
 
-    let player;
-    let platforms = [];
-    let coinsArr = [];
+function buildLevel(){
+  platforms=[]; coins=[];
+  let baseY = canvas.height-60;
+  // BASE ocupa todo el ancho visible
+  platforms.push(new Platform(0, baseY, canvas.width, 20));
+  // escalones
+  for(let i=0;i<8;i++){
+    let x=200+i*200;
+    let y=baseY-(Math.random()*150+50);
+    platforms.push(new Platform(x,y,120,20));
+    if(Math.random()<0.7) coins.push(new Coin(x+60,y-30));
+  }
+  let last=platforms[platforms.length-1];
+  meta={x:last.x+last.w/2-25,y:last.y-50,w:50,h:50};
+  player=new Player(80,baseY-40);
+  enemy=new Enemy(20,baseY-40);
+}
+function resetLevel(){ buildLevel(); }
+function nextLevel(){ levelIndex++; buildLevel(); }
 
-    function generateLevel() {
-      platforms = [];
-      coinsArr = [];
-      // Base larga
-      platforms.push(new Platform(0, canvas.height - 50, canvas.width, 50));
-      // Escalones
-      for (let i = 0; i < 5; i++) {
-        let px = 200 + i * 200;
-        let py = canvas.height - (100 + i * 70);
-        platforms.push(new Platform(px, py, 120, 20));
-        coinsArr.push(new Coin(px + 60, py - 20));
-      }
+buildLevel();
+
+function gameLoop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // BG
+  ctx.fillStyle=`hsl(${levelIndex*36},70%,80%)`;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  for(let p of platforms) p.draw();
+  for(let c of coins) c.draw();
+
+  ctx.fillStyle="green";
+  ctx.fillRect(meta.x,meta.y,meta.w,meta.h);
+
+  player.update(platforms);
+  player.draw();
+
+  enemy.update(platforms);
+  enemy.draw();
+
+  for(let c of coins){
+    if(!c.collected && Math.hypot(player.x-player.w/2-c.x, player.y-player.h/2-c.y)<30){
+      c.collected=true; score++;
     }
+  }
+  if(player.x<enemy.x+enemy.w && player.x+player.w>enemy.x &&
+     player.y<enemy.y+enemy.h && player.y+player.h>enemy.y){ resetLevel(); }
+  if(player.x<meta.x+meta.w && player.x+player.w>meta.x &&
+     player.y<meta.y+meta.h && player.y+player.h>meta.y){ nextLevel(); }
 
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+  document.getElementById("hud").textContent=`Nivel: ${levelIndex+1} | Monedas: ${score}`;
 
-      generateLevel();
-      if (!player) {
-        player = new Player(100, canvas.height - 150, "blue");
-      } else {
-        player.y = canvas.height - player.height - 60; // siempre sobre la base
-      }
-    }
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
+  requestAnimationFrame(gameLoop);
+}
+gameLoop();
 
-    function gameLoop() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+// Controles teclado
+window.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft") keys.left=true;
+  if(e.key==="ArrowRight") keys.right=true;
+  if(e.key==="ArrowUp" && player.onGround) player.vy=-15;
+});
+window.addEventListener("keyup",e=>{
+  if(e.key==="ArrowLeft") keys.left=false;
+  if(e.key==="ArrowRight") keys.right=false;
+});
 
-      // Dibujar plataformas
-      for (let p of platforms) p.draw();
+// Controles móviles
+document.getElementById("left").addEventListener("touchstart",()=>keys.left=true);
+document.getElementById("left").addEventListener("touchend",()=>keys.left=false);
+document.getElementById("right").addEventListener("touchstart",()=>keys.right=true);
+document.getElementById("right").addEventListener("touchend",()=>keys.right=false);
+document.getElementById("jump").addEventListener("touchstart",()=>{if(player.onGround) player.vy=-15;});
 
-      // Dibujar monedas
-      for (let c of coinsArr) {
-        if (!c.collected &&
-            player.x < c.x + c.radius &&
-            player.x + player.width > c.x - c.radius &&
-            player.y < c.y + c.radius &&
-            player.y + player.height > c.y - c.radius) {
-          c.collected = true;
-          coins++;
-          score += 100;
-        }
-        c.draw();
-      }
-
-      // Actualizar jugador
-      player.update(platforms);
-      player.draw();
-
-      // Actualizar HUD
-      hud.textContent = `Nivel: ${level} | Monedas: ${coins} | Puntos: ${score}`;
-
-      requestAnimationFrame(gameLoop);
-    }
-    gameLoop();
-
-    // Controles de teclado
-    window.addEventListener("keydown", (e) => {
-      if (e.code === "ArrowLeft") keys.left = true;
-      if (e.code === "ArrowRight") keys.right = true;
-      if (e.code === "Space") player.jump();
-    });
-    window.addEventListener("keyup", (e) => {
-      if (e.code === "ArrowLeft") keys.left = false;
-      if (e.code === "ArrowRight") keys.right = false;
-    });
-
-    // Controles táctiles
-    function bindButton(btn, action, isJump = false) {
-      btn.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        if (isJump) player.jump();
-        else keys[action] = true;
-      });
-      btn.addEventListener("touchend", (e) => {
-        e.preventDefault();
-        if (!isJump) keys[action] = false;
-      });
-    }
-    bindButton(document.getElementById("btnLeft"), "left");
-    bindButton(document.getElementById("btnRight"), "right");
-    bindButton(document.getElementById("btnJump"), null, true);
-  </script>
+</script>
 </body>
 </html>
